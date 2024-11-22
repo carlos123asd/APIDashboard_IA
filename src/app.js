@@ -10,6 +10,9 @@ const port = 3001;
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req,res) => {
+    return res.send("INICIO");
+});
 app.use('/analysis', routeIA);
 
 const startServer = () => {

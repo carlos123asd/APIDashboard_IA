@@ -1,44 +1,41 @@
 import { Router } from "express";
+import OpenAI from "openai";
 
 const routeIA = Router()
 
 const postCharAnalisisMain = async (req,res) => {
     const { rooms, gaining } = req.body
-    const propmt = `
-        Estas son las habitaciones ${rooms}
-        y estas son las ganacias respecto a las habitaciones mes a mes
-        ${gaining}. Analisa los datos y en funcion de esos datos
-        quiero que me des una lectura de los datos y en caso de ser favorable
-        añadir una felicitacion al final y un posible consejo para seguir 
-        subiendo la ocupacion del hotel y si es negativa centrarse en dar un 
-        seguimiento de esas habitaciones que necesitas aumentar su ocupacion
-        dando consejos para esas habitaciones, no olvides mencionar
-        el titulo de las habitaciones, todo esto me lo tienes que dar en ingles.
-    `;
+    const roomFormated = rooms.join(', ');
+    const gainingFormated = gaining.map((gain,index) => {
+        return `Month ${index+1}: ${gain.join(', ')}`
+    })
+    
+    const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY
+    });
+    const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+            { role: "system", content: "You are an expert data analyst specializing in hotel management. Your task is to analyze data about room occupancy and revenue, provide a concise summary of the trends, and suggest actionable strategies to improve room occupancy rates. Always respond in English." },
+            {
+                role: "user",
+                content: `
+                    These are the rooms: ${roomFormated}  
+                    and these are the revenues for the rooms month by month (each month includes the revenue for all rooms in an ordered manner):  
+                    ${gainingFormated}. Analyze the data, and based on it,  
+                    provide an evaluation. If the performance is favorable,  
+                    include a congratulatory remark for the progress in the occupancy of those rooms  
+                    and offer advice to further increase the hotel's occupancy.  
+                    If the performance is unfavorable, focus on tracking those rooms that  
+                    need to improve their occupancy by providing specific advice for those rooms.
+                `
+            }
+        ]
+    });
 
-    try{
-        const response = await fetch('https://api.openai.com/v1/completions', {
-            method: "POST",
-            headers: {
-                'Content-Type': "application/json",
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: "text-davinci-003",
-                propmt,
-                max_tokens: 200,
-            })
-        });
-        if(response.ok){
-            const data = await response.json();
-            res.send({
-                response: data.choices[0].text.trim()
-            });
-        }
-    }catch(error){
-        console.error(error)
-        res.status(500).send("Hubo un problema con el analisis charAnalisisMain");
-    }
+    res.send({
+        response: completion.choices[0].message.content
+    });
 }
 
 routeIA.post('/analysisChar',postCharAnalisisMain)
